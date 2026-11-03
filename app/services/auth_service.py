@@ -1,0 +1,164 @@
+from datetime import datetime, timezone
+import uuid
+from typing import Optional
+from fastapi import HTTPException, status
+from motor.motor_asyncio import AsyncIOMotorCollection
+
+from app.core.config import settings
+from app.core.security import hash_password, verify_password, create_access_token
+from app.database.mongodb import get_user_collection
+from app.schemas.auth import SignUpRequest, LoginRequest, TokenResponse, UserProfileResponse
+
+
+class AuthService:
+    """Handles core business logic for user registration, authentication, and profiles."""
+
+    def __init__(self, collection: Optional[AsyncIOMotorCollection] = None):
+        self._col = collection
+
+    @property
+    def col(self) -> AsyncIOMotorCollection:
+        if self._col is not None:
+            return self._col
+        return get_user_collection()
+
+    async def register_user(self, data: SignUpRequest) -> TokenResponse:
+        """Registers a new user, hashes password with Argon2, saves to MongoDB, returns JWT and profile."""
+        collection = self.col
+
+        # Check duplicate email
+        existing_email = await collection.find_one({"email": data.email})
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email address already exists.",
+            )
+
+        # Check duplicate username
+        existing_user = await collection.find_one({"username": data.username})
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username is already taken. Please choose another username.",
+            )
+
+        # Secure Argon2 password hashing
+        hashed = hash_password(data.password)
+
+        user_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+
+        user_doc = {
+            "id": user_id,
+            "full_name": data.full_name,
+            "username": data.username,
+            "email": data.email,
+            "mobile_number": data.mobile_number,
+            "hashed_password": hashed,
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+        await collection.insert_one(user_doc)
+
+        profile = UserProfileResponse(
+            id=user_id,
+            full_name=data.full_name,
+            username=data.username,
+            email=data.email,
+            mobile_number=data.mobile_number,
+            created_at=now,
+        )
+
+        access_token = create_access_token({
+            "sub": user_id,
+            "username": data.username,
+            "email": data.email,
+        })
+
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.access_token_expire_minutes * 60,
+            user=profile,
+        )
+
+    async def authenticate_user(self, data: LoginRequest) -> TokenResponse:
+        """Authenticates user with username or email and verifies Argon2 password."""
+        collection = self.col
+        identifier = data.identifier.strip().lower()
+
+        # Find user by either email or username
+        user = await collection.find_one({
+            "$or": [
+                {"email": identifier},
+                {"username": identifier},
+            ]
+        })
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username/email or password.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Verify password using Argon2
+        if not verify_password(data.password, user.get("hashed_password", "")):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username/email or password.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This account has been deactivated.",
+            )
+
+        profile = UserProfileResponse(
+            id=user["id"],
+            full_name=user["full_name"],
+            username=user["username"],
+            email=user["email"],
+            mobile_number=user["mobile_number"],
+            created_at=user["created_at"],
+        )
+
+        access_token = create_access_token({
+            "sub": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+        })
+
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=settings.access_token_expire_minutes * 60,
+            user=profile,
+        )
+
+    async def get_user_profile(self, user_id: str) -> UserProfileResponse:
+        """Retrieves user profile without password hash."""
+        collection = self.col
+        user = await collection.find_one({"id": user_id})
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found.",
+            )
+
+        return UserProfileResponse(
+            id=user["id"],
+            full_name=user["full_name"],
+            username=user["username"],
+            email=user["email"],
+            mobile_number=user["mobile_number"],
+            created_at=user["created_at"],
+        )
+
+
+auth_service = AuthService()
