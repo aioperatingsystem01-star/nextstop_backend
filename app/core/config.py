@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and .env file."""
 
-    mongodb_uri: str = "mongodb+srv://nextstop_admin:YOUR_PASSWORD@cluster0.t7jdntk.mongodb.net/"
+    mongodb_uri: str = "mongodb+srv://nextstop_admin:nextstop_2006Top@cluster0.t7jdntk.mongodb.net/"
     database_name: str = "nextstop"
     jwt_secret_key: str = "default_secret_key_change_in_production"
     jwt_algorithm: str = "HS256"
