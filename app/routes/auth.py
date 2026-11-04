@@ -1,8 +1,14 @@
 from fastapi import APIRouter, status, Depends
-from app.schemas.auth import SignUpRequest, LoginRequest, TokenResponse, MessageResponse
+from app.schemas.auth import (
+    SignUpRequest,
+    LoginRequest,
+    TokenResponse,
+    MessageResponse,
+    RefreshTokenRequest,
+    UserProfileResponse,
+)
 from app.services.auth_service import auth_service
 from app.core.dependencies import get_current_user
-from app.schemas.auth import UserProfileResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -41,3 +47,15 @@ async def login(request: LoginRequest) -> TokenResponse:
 async def logout(current_user: UserProfileResponse = Depends(get_current_user)) -> MessageResponse:
     """Invalidates/acknowledges client logout."""
     return MessageResponse(message=f"Successfully logged out {current_user.username}.")
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh access token",
+    description="Exchanges a valid refresh token for a fresh access token and rotated refresh token.",
+)
+async def refresh(request: RefreshTokenRequest) -> TokenResponse:
+    """Exchanges a valid refresh token for a new access token and rotated refresh token."""
+    return await auth_service.refresh_session(request.refresh_token)

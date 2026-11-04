@@ -14,7 +14,8 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = "default_secret_key_change_in_production"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 43200  # 30 days default for permanent mobile session
+    refresh_token_expire_days: int = 90  # 90 days refresh token lifetime
 
     allowed_origins: str = "*"
 

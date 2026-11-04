@@ -4,8 +4,15 @@ from typing import Optional
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+import jwt
 from app.core.config import settings
-from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+)
 from app.database.mongodb import get_user_collection
 from app.schemas.auth import SignUpRequest, LoginRequest, TokenResponse, UserProfileResponse
 
@@ -77,10 +84,17 @@ class AuthService:
             "email": data.email,
         })
 
+        refresh_token = create_refresh_token({
+            "sub": user_id,
+            "username": data.username,
+            "email": data.email,
+        })
+
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.access_token_expire_minutes * 60,
+            refresh_token=refresh_token,
             user=profile,
         )
 
@@ -133,10 +147,79 @@ class AuthService:
             "email": user["email"],
         })
 
+        refresh_token = create_refresh_token({
+            "sub": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+        })
+
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
             expires_in=settings.access_token_expire_minutes * 60,
+            refresh_token=refresh_token,
+            user=profile,
+        )
+
+    async def refresh_session(self, refresh_token: str) -> TokenResponse:
+        """Validates a refresh token and returns a new access token and rotated refresh token."""
+        try:
+            payload = decode_refresh_token(refresh_token)
+            user_id: Optional[str] = payload.get("sub")
+            if not user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid refresh token payload.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has expired. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        collection = self.col
+        user = await collection.find_one({"id": user_id})
+        if not user or not user.get("is_active", True):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account not found or deactivated.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        profile = UserProfileResponse(
+            id=user["id"],
+            full_name=user["full_name"],
+            username=user["username"],
+            email=user["email"],
+            mobile_number=user["mobile_number"],
+            created_at=user["created_at"],
+        )
+
+        new_access_token = create_access_token({
+            "sub": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+        })
+
+        new_refresh_token = create_refresh_token({
+            "sub": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+        })
+
+        return TokenResponse(
+            access_token=new_access_token,
+            token_type="bearer",
+            expires_in=settings.access_token_expire_minutes * 60,
+            refresh_token=new_refresh_token,
             user=profile,
         )
 

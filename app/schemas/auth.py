@@ -81,7 +81,13 @@ class TokenResponse(BaseModel):
     access_token: str = Field(..., description="JWT bearer access token")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Token validity duration in seconds")
+    refresh_token: Optional[str] = Field(default=None, description="Optional JWT refresh token")
     user: UserProfileResponse = Field(..., description="Authenticated user profile")
+
+
+class RefreshTokenRequest(BaseModel):
+    """Schema for refreshing access tokens."""
+    refresh_token: str = Field(..., min_length=1, description="Valid JWT refresh token")
 
 
 class MessageResponse(BaseModel):

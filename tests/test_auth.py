@@ -405,3 +405,83 @@ async def test_15_actual_user_record_storage_in_mongodb(setup_mock_db):
     # Verify password verification works against stored Argon2 hash
     assert verify_password(plain_pass, stored_hash) is True
     assert verify_password("WrongPassword", stored_hash) is False
+
+
+@pytest.mark.asyncio
+async def test_16_token_expiration_and_refresh_token_generation(setup_mock_db):
+    """16. Test 30-day token expiration and refresh token issuance."""
+    payload = {
+        "full_name": "Long Session User",
+        "username": "longsession",
+        "email": "long@nextstop.com",
+        "mobile_number": "+1122334455",
+        "password": "Password123!",
+        "confirm_password": "Password123!",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res = await ac.post("/api/v1/auth/signup", json=payload)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["expires_in"] == 43200 * 60  # 30 days in seconds
+        assert "refresh_token" in data
+        assert data["refresh_token"] is not None
+
+        # Verify login also issues refresh_token
+        login_res = await ac.post("/api/v1/auth/login", json={
+            "identifier": "longsession",
+            "password": "Password123!",
+        })
+        assert login_res.status_code == 200
+        login_data = login_res.json()
+        assert login_data["expires_in"] == 43200 * 60
+        assert "refresh_token" in login_data
+        assert login_data["refresh_token"] is not None
+
+
+@pytest.mark.asyncio
+async def test_17_refresh_token_endpoint_success_and_rotation(setup_mock_db):
+    """17. Test token refresh endpoint returns fresh access and rotated refresh token."""
+    payload = {
+        "full_name": "Refresh Tester",
+        "username": "refresher",
+        "email": "refresh@nextstop.com",
+        "mobile_number": "+1122334466",
+        "password": "Password123!",
+        "confirm_password": "Password123!",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        reg_res = await ac.post("/api/v1/auth/signup", json=payload)
+        assert reg_res.status_code == 201
+        orig_refresh = reg_res.json()["refresh_token"]
+
+        # Call refresh endpoint
+        ref_res = await ac.post("/api/v1/auth/refresh", json={"refresh_token": orig_refresh})
+        assert ref_res.status_code == 200
+        ref_data = ref_res.json()
+        assert "access_token" in ref_data
+        assert "refresh_token" in ref_data
+        assert ref_data["user"]["username"] == "refresher"
+
+
+@pytest.mark.asyncio
+async def test_18_refresh_token_endpoint_rejections(setup_mock_db):
+    """18. Test refresh token validation rejects invalid or access tokens."""
+    payload = {
+        "full_name": "Rejection Tester",
+        "username": "rejectme",
+        "email": "reject@nextstop.com",
+        "mobile_number": "+1122334477",
+        "password": "Password123!",
+        "confirm_password": "Password123!",
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        reg_res = await ac.post("/api/v1/auth/signup", json=payload)
+        access_tok = reg_res.json()["access_token"]
+
+        # 1. Invalid string
+        bad1 = await ac.post("/api/v1/auth/refresh", json={"refresh_token": "not.a.valid.jwt"})
+        assert bad1.status_code == 401
+
+        # 2. Passing access token as refresh token should fail
+        bad2 = await ac.post("/api/v1/auth/refresh", json={"refresh_token": access_tok})
+        assert bad2.status_code == 401

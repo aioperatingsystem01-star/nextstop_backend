@@ -66,3 +66,45 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         settings.jwt_secret_key,
         algorithms=[settings.jwt_algorithm],
     )
+
+
+def create_refresh_token(
+    data: Dict[str, Any],
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Generates a signed JWT refresh token."""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(days=settings.refresh_token_expire_days)
+
+    to_encode.update({
+        "iat": now,
+        "exp": expire,
+        "jti": str(uuid.uuid4()),
+        "token_type": "refresh",
+    })
+    return jwt.encode(
+        to_encode,
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def decode_refresh_token(token: str) -> Dict[str, Any]:
+    """Decodes and validates a JWT refresh token.
+    
+    Raises:
+        jwt.ExpiredSignatureError: When the refresh token has expired.
+        jwt.InvalidTokenError: When the token signature or token_type is invalid.
+    """
+    payload = jwt.decode(
+        token,
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+    )
+    if payload.get("token_type") != "refresh":
+        raise jwt.InvalidTokenError("Token is not a valid refresh token.")
+    return payload
