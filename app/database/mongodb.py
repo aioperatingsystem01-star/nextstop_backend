@@ -94,8 +94,18 @@ async def connect_to_mongo():
             name="uniq_user_username",
         )
 
+        await user_col.create_index(
+            [("full_name", ASCENDING)],
+            name="idx_user_full_name",
+        )
+
+        await user_col.create_index(
+            [("is_active", ASCENDING), ("username", ASCENDING)],
+            name="idx_active_username",
+        )
+
         logger.info(
-            "Unique indexes on 'email' and 'username' verified successfully."
+            "Indexes on 'email', 'username', and 'full_name' verified successfully."
         )
 
     except Exception as exc:

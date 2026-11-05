@@ -12,6 +12,12 @@ class UserModel(BaseModel):
     mobile_number: str = Field(..., description="User mobile contact number")
     hashed_password: str = Field(..., description="Argon2-hashed password")
     is_active: bool = Field(default=True, description="Account active status")
+    profile_picture: Optional[str] = Field(default="", description="Profile image URL")
+    avatar_url: Optional[str] = Field(default="", description="Avatar image URL")
+    bio: Optional[str] = Field(default="", description="User bio or description")
+    is_verified: bool = Field(default=False, description="Verification badge status")
+    followers_count: int = Field(default=0, description="Follower count")
+    following_count: int = Field(default=0, description="Following count")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp of user account creation",
