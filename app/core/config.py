@@ -1,5 +1,4 @@
 
-import os
 from pathlib import Path
 from typing import List
 
@@ -9,14 +8,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables and .env file."""
 
-    mongodb_uri: str = "mongodb+srv://nextstop_admin:nextstop_2006saloni@cluster0.t7jdntk.mongodb.net/nextstop?retryWrites=true&w=majority"
+    # MongoDB settings
+    mongodb_uri: str
     database_name: str = "nextstop"
 
-    jwt_secret_key: str = "default_secret_key_change_in_production"
-    jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 43200  # 30 days default for permanent mobile session
-    refresh_token_expire_days: int = 90  # 90 days refresh token lifetime
+    # Supabase settings
+    supabase_url: str
+    supabase_secret_key: str
 
+    # JWT settings
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 43200
+    refresh_token_expire_days: int = 90
+
+    # CORS settings
     allowed_origins: str = "*"
 
     model_config = SettingsConfigDict(
