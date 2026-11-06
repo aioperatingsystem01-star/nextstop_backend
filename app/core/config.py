@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # Supabase settings
     supabase_url: str
     supabase_secret_key: str
+    supabase_bucket: str = "nextstop-media"
 
     # JWT settings
     jwt_secret_key: str

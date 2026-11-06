@@ -8,7 +8,7 @@ from motor.motor_asyncio import (
     AsyncIOMotorDatabase,
     AsyncIOMotorCollection,
 )
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
 
 from app.core.config import settings
 
@@ -104,8 +104,90 @@ async def connect_to_mongo():
             name="idx_active_username",
         )
 
+        # Index follows collection
+        follows_col = db_instance.db["follows"]
+        await follows_col.create_index(
+            [("follower_user_id", ASCENDING), ("following_user_id", ASCENDING)],
+            unique=True,
+            name="uniq_follow_relationship",
+        )
+        await follows_col.create_index(
+            [("follower_user_id", ASCENDING)],
+            name="idx_follower_user_id",
+        )
+        await follows_col.create_index(
+            [("following_user_id", ASCENDING)],
+            name="idx_following_user_id",
+        )
+
+        # Index posts collection
+        posts_col = db_instance.db["posts"]
+        await posts_col.create_index(
+            [("user_id", ASCENDING), ("created_at", DESCENDING)],
+            name="idx_posts_user_created",
+        )
+        await posts_col.create_index(
+            [("created_at", DESCENDING)],
+            name="idx_posts_created_at",
+        )
+
+        # Index likes collection
+        likes_col = db_instance.db["likes"]
+        await likes_col.create_index(
+            [("user_id", ASCENDING), ("post_id", ASCENDING)],
+            unique=True,
+            name="uniq_user_post_like",
+        )
+
+        # Index comments collection
+        comments_col = db_instance.db["comments"]
+        await comments_col.create_index(
+            [("post_id", ASCENDING), ("created_at", ASCENDING)],
+            name="idx_comments_post_created",
+        )
+
+        # Index saved_posts collection
+        saved_col = db_instance.db["saved_posts"]
+        await saved_col.create_index(
+            [("user_id", ASCENDING), ("post_id", ASCENDING)],
+            unique=True,
+            name="uniq_user_saved_post",
+        )
+
+        # Index conversations & messages
+        convs_col = db_instance.db["conversations"]
+        await convs_col.create_index(
+            [("participant_ids", ASCENDING)],
+            name="idx_conv_participants",
+        )
+        await convs_col.create_index(
+            [("updated_at", DESCENDING)],
+            name="idx_conv_updated_at",
+        )
+
+        msgs_col = db_instance.db["messages"]
+        await msgs_col.create_index(
+            [("conversation_id", ASCENDING), ("created_at", ASCENDING)],
+            name="idx_messages_conv_created",
+        )
+
+        # Index notifications
+        notif_col = db_instance.db["notifications"]
+        await notif_col.create_index(
+            [("recipient_id", ASCENDING), ("is_read", ASCENDING), ("created_at", DESCENDING)],
+            name="idx_notif_recipient_read",
+        )
+
+        # Index blocks & reports
+        blocks_col = db_instance.db["blocks"]
+        await blocks_col.create_index(
+            [("blocker_id", ASCENDING), ("blocked_id", ASCENDING)],
+            unique=True,
+            name="uniq_block_pair",
+        )
+
         logger.info(
-            "Indexes on 'email', 'username', and 'full_name' verified successfully."
+            "Indexes on users, follows, posts, likes, comments, conversations, messages, and notifications verified."
         )
 
     except Exception as exc:
@@ -144,13 +226,66 @@ def get_database() -> Optional[AsyncIOMotorDatabase]:
     return db_instance.db
 
 
-def get_user_collection() -> AsyncIOMotorCollection:
-    """Return users collection."""
-
+def get_collection(name: str) -> AsyncIOMotorCollection:
+    """Generic collection getter."""
     if db_instance.db is None:
         raise RuntimeError(
             "Database connection has not been initialized. "
             "Please check MONGODB_URI in Render Environment."
         )
+    return db_instance.db[name]
 
-    return db_instance.db["users"]
+
+def get_user_collection() -> AsyncIOMotorCollection:
+    """Return users collection."""
+    return get_collection("users")
+
+
+def get_follow_collection() -> AsyncIOMotorCollection:
+    """Return follows collection."""
+    return get_collection("follows")
+
+
+def get_post_collection() -> AsyncIOMotorCollection:
+    """Return posts collection."""
+    return get_collection("posts")
+
+
+def get_like_collection() -> AsyncIOMotorCollection:
+    """Return likes collection."""
+    return get_collection("likes")
+
+
+def get_comment_collection() -> AsyncIOMotorCollection:
+    """Return comments collection."""
+    return get_collection("comments")
+
+
+def get_saved_post_collection() -> AsyncIOMotorCollection:
+    """Return saved_posts collection."""
+    return get_collection("saved_posts")
+
+
+def get_conversation_collection() -> AsyncIOMotorCollection:
+    """Return conversations collection."""
+    return get_collection("conversations")
+
+
+def get_message_collection() -> AsyncIOMotorCollection:
+    """Return messages collection."""
+    return get_collection("messages")
+
+
+def get_notification_collection() -> AsyncIOMotorCollection:
+    """Return notifications collection."""
+    return get_collection("notifications")
+
+
+def get_block_collection() -> AsyncIOMotorCollection:
+    """Return blocks collection."""
+    return get_collection("blocks")
+
+
+def get_report_collection() -> AsyncIOMotorCollection:
+    """Return reports collection."""
+    return get_collection("reports")

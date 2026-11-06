@@ -74,6 +74,14 @@ class UserProfileResponse(BaseModel):
     email: str = Field(..., description="User's email address")
     mobile_number: str = Field(..., description="User's mobile number")
     created_at: datetime = Field(..., description="Account creation timestamp")
+    profile_picture: Optional[str] = Field(default="", description="Profile picture URL")
+    avatar_url: Optional[str] = Field(default="", description="Avatar alias URL")
+    bio: Optional[str] = Field(default="", description="User bio")
+    website: Optional[str] = Field(default="", description="User website/portfolio URL")
+    is_verified: bool = Field(default=False, description="Verification status")
+    followers_count: int = Field(default=0, description="Follower count")
+    following_count: int = Field(default=0, description="Following count")
+    posts_count: int = Field(default=0, description="Posts count")
 
 
 class TokenResponse(BaseModel):

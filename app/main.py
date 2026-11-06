@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection, get_database
-from app.routes import auth, users
+from app.routes import auth, users, posts, chat, notifications
 
 
 @asynccontextmanager
@@ -44,8 +44,15 @@ app.add_middleware(
 # Register API Routers (supporting both /api/v1 and /api conventions)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+app.include_router(posts.router, prefix="/api/v1")
+app.include_router(chat.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(posts.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 
 
 @app.get(

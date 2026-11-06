@@ -234,13 +234,22 @@ class AuthService:
                 detail="User profile not found.",
             )
 
+        pic = user.get("profile_picture") or user.get("avatar_url") or ""
         return UserProfileResponse(
             id=user["id"],
             full_name=user["full_name"],
             username=user["username"],
             email=user["email"],
-            mobile_number=user["mobile_number"],
+            mobile_number=user.get("mobile_number", ""),
             created_at=user["created_at"],
+            profile_picture=pic,
+            avatar_url=pic,
+            bio=user.get("bio", ""),
+            website=user.get("website", ""),
+            is_verified=bool(user.get("is_verified", False)),
+            followers_count=int(user.get("followers_count", 0)),
+            following_count=int(user.get("following_count", 0)),
+            posts_count=int(user.get("posts_count", 0)),
         )
 
 
