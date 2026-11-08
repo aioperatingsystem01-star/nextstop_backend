@@ -1,6 +1,7 @@
 
 import asyncio
 import logging
+import os
 from typing import Optional
 
 from motor.motor_asyncio import (
@@ -27,6 +28,9 @@ db_instance = MongoDB()
 
 async def connect_to_mongo():
     """Initialize MongoDB client, verify connection, and create indexes."""
+    if os.environ.get("TESTING") == "1":
+        logger.info("Skipping MongoDB connection in TESTING mode.")
+        return
 
     if db_instance.client is not None:
         logger.info("MongoDB client already configured.")
@@ -208,6 +212,8 @@ async def connect_to_mongo():
 
 async def close_mongo_connection():
     """Gracefully close MongoDB connection."""
+    if os.environ.get("TESTING") == "1":
+        return
 
     if db_instance.client is not None:
         try:

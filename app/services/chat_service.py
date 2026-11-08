@@ -144,12 +144,28 @@ class ChatService:
         cursor = self.msg_col.find({"conversation_id": conversation_id}).sort("created_at", 1).limit(limit)
         docs = await cursor.to_list(length=limit)
 
+        user_col = get_user_collection()
+        p_ids = conv.get("participant_ids", [])
+        user_docs = await user_col.find(
+            {"id": {"$in": p_ids}},
+            {"_id": 0, "id": 1, "full_name": 1, "username": 1, "profile_picture": 1, "avatar_url": 1},
+        ).to_list(length=len(p_ids)) if p_ids else []
+        user_map = {
+            u["id"]: (
+                u.get("full_name") or u.get("username") or "",
+                u.get("profile_picture") or u.get("avatar_url") or "",
+            )
+            for u in user_docs
+        }
+
         messages = [
             MessageResponse(
                 id=d["id"],
                 conversation_id=d["conversation_id"],
                 sender_id=d["sender_id"],
                 recipient_id=d["recipient_id"],
+                sender_name=user_map.get(d["sender_id"], ("", ""))[0],
+                sender_avatar=user_map.get(d["sender_id"], ("", ""))[1],
                 text=d.get("text", ""),
                 media_url=d.get("media_url", ""),
                 message_type=d.get("message_type", "text"),
@@ -221,11 +237,19 @@ class ChatService:
             },
         )
 
+        # Fetch sender info for real-time payload and notification
+        user_col = get_user_collection()
+        sender = await user_col.find_one({"id": sender_id})
+        sender_name = (sender.get("full_name") or sender.get("username")) if sender else "Someone"
+        sender_avatar = (sender.get("profile_picture") or sender.get("avatar_url")) if sender else ""
+
         msg_resp = MessageResponse(
             id=msg_id,
             conversation_id=conversation_id,
             sender_id=sender_id,
             recipient_id=recipient_id,
+            sender_name=sender_name,
+            sender_avatar=sender_avatar,
             text=msg.text,
             media_url=msg.media_url,
             message_type=msg.message_type,
@@ -240,14 +264,7 @@ class ChatService:
         }
         await ws_manager.send_personal_message(recipient_id, payload)
 
-        # Also send echo to sender's other devices
-        await ws_manager.send_personal_message(sender_id, payload)
-
         # Notify recipient
-        user_col = get_user_collection()
-        sender = await user_col.find_one({"id": sender_id})
-        sender_name = sender.get("full_name") or sender.get("username") if sender else "Someone"
-
         await notification_service.create_notification(
             recipient_id=recipient_id,
             actor_id=sender_id,

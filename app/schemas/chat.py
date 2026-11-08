@@ -18,6 +18,8 @@ class MessageResponse(BaseModel):
     conversation_id: str
     sender_id: str
     recipient_id: str
+    sender_name: Optional[str] = None
+    sender_avatar: Optional[str] = None
     text: str = ""
     media_url: Optional[str] = ""
     message_type: str = "text"

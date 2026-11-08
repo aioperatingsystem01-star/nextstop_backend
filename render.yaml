@@ -15,6 +15,14 @@ services:
       - key: JWT_ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 30
+        value: 43200
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 90
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: nextstop-media
       - key: ALLOWED_ORIGINS
         value: "*"
