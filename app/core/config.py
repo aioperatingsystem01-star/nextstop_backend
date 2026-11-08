@@ -179,7 +179,7 @@ class Settings(BaseSettings):
         if not clean:
             raise ValueError(
                 "MONGODB_URI is required and cannot be empty. "
-                "Provide a valid connection string (e.g., 'mongodb+srv://user:pass@cluster.mongodb.net/nextstop')."
+                "Provide a valid connection string (e.g., 'mongodb+srv://user:nextstoptop_2018@cluster.mongodb.net/nextstop')."
             )
         if not clean.startswith(("mongodb://", "mongodb+srv://")):
             raise ValueError(
