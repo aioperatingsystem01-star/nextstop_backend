@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Optional
 
+import certifi
 from motor.motor_asyncio import (
     AsyncIOMotorClient,
     AsyncIOMotorDatabase,
@@ -64,150 +65,99 @@ async def connect_to_mongo():
     )
 
     try:
-        db_instance.client = AsyncIOMotorClient(
-            mongodb_uri,
-            serverSelectionTimeoutMS=10000,
-            connectTimeoutMS=10000,
-            socketTimeoutMS=20000,
-            retryWrites=True,
-            tls=True,
-        )
+        client_kwargs = {
+            "serverSelectionTimeoutMS": 5000,
+            "connectTimeoutMS": 5000,
+            "socketTimeoutMS": 10000,
+            "retryWrites": True,
+        }
+        try:
+            client_kwargs["tlsCAFile"] = certifi.where()
+        except Exception:
+            pass
 
+        db_instance.client = AsyncIOMotorClient(mongodb_uri, **client_kwargs)
         db_instance.db = db_instance.client[settings.database_name]
 
-        # Verify MongoDB Atlas connectivity
-        await asyncio.wait_for(
-            db_instance.client.admin.command("ping"),
-            timeout=15.0,
-        )
-
-        logger.info("Successfully connected to MongoDB Atlas!")
-
-        # Create unique indexes on users collection
-        user_col = db_instance.db["users"]
-
-        await user_col.create_index(
-            [("email", ASCENDING)],
-            unique=True,
-            name="uniq_user_email",
-        )
-
-        await user_col.create_index(
-            [("username", ASCENDING)],
-            unique=True,
-            name="uniq_user_username",
-        )
-
-        await user_col.create_index(
-            [("full_name", ASCENDING)],
-            name="idx_user_full_name",
-        )
-
-        await user_col.create_index(
-            [("is_active", ASCENDING), ("username", ASCENDING)],
-            name="idx_active_username",
-        )
-
-        # Index follows collection
-        follows_col = db_instance.db["follows"]
-        await follows_col.create_index(
-            [("follower_user_id", ASCENDING), ("following_user_id", ASCENDING)],
-            unique=True,
-            name="uniq_follow_relationship",
-        )
-        await follows_col.create_index(
-            [("follower_user_id", ASCENDING)],
-            name="idx_follower_user_id",
-        )
-        await follows_col.create_index(
-            [("following_user_id", ASCENDING)],
-            name="idx_following_user_id",
-        )
-
-        # Index posts collection
-        posts_col = db_instance.db["posts"]
-        await posts_col.create_index(
-            [("user_id", ASCENDING), ("created_at", DESCENDING)],
-            name="idx_posts_user_created",
-        )
-        await posts_col.create_index(
-            [("created_at", DESCENDING)],
-            name="idx_posts_created_at",
-        )
-
-        # Index likes collection
-        likes_col = db_instance.db["likes"]
-        await likes_col.create_index(
-            [("user_id", ASCENDING), ("post_id", ASCENDING)],
-            unique=True,
-            name="uniq_user_post_like",
-        )
-
-        # Index comments collection
-        comments_col = db_instance.db["comments"]
-        await comments_col.create_index(
-            [("post_id", ASCENDING), ("created_at", ASCENDING)],
-            name="idx_comments_post_created",
-        )
-
-        # Index saved_posts collection
-        saved_col = db_instance.db["saved_posts"]
-        await saved_col.create_index(
-            [("user_id", ASCENDING), ("post_id", ASCENDING)],
-            unique=True,
-            name="uniq_user_saved_post",
-        )
-
-        # Index conversations & messages
-        convs_col = db_instance.db["conversations"]
-        await convs_col.create_index(
-            [("participant_ids", ASCENDING)],
-            name="idx_conv_participants",
-        )
-        await convs_col.create_index(
-            [("updated_at", DESCENDING)],
-            name="idx_conv_updated_at",
-        )
-
-        msgs_col = db_instance.db["messages"]
-        await msgs_col.create_index(
-            [("conversation_id", ASCENDING), ("created_at", ASCENDING)],
-            name="idx_messages_conv_created",
-        )
-
-        # Index notifications
-        notif_col = db_instance.db["notifications"]
-        await notif_col.create_index(
-            [("recipient_id", ASCENDING), ("is_read", ASCENDING), ("created_at", DESCENDING)],
-            name="idx_notif_recipient_read",
-        )
-
-        # Index blocks & reports
-        blocks_col = db_instance.db["blocks"]
-        await blocks_col.create_index(
-            [("blocker_id", ASCENDING), ("blocked_id", ASCENDING)],
-            unique=True,
-            name="uniq_block_pair",
-        )
-
-        logger.info(
-            "Indexes on users, follows, posts, likes, comments, conversations, messages, and notifications verified."
-        )
+        # Verify MongoDB Atlas connectivity with a non-blocking timeout
+        # If ping times out or fails (e.g. IP whitelist 0.0.0.0/0 missing in Atlas),
+        # log a warning but keep the client active so Motor can reconnect when ready.
+        try:
+            await asyncio.wait_for(
+                db_instance.client.admin.command("ping"),
+                timeout=3.0,
+            )
+            logger.info("Successfully connected to MongoDB Atlas!")
+            await _create_indexes(db_instance.db)
+        except Exception as ping_exc:
+            logger.warning(
+                "MongoDB Atlas ping check did not complete during startup (%s: %s). "
+                "The web server is online. Please ensure '0.0.0.0/0' is whitelisted in MongoDB Atlas "
+                "Network Access so Render can communicate with your database.",
+                type(ping_exc).__name__,
+                ping_exc,
+            )
 
     except Exception as exc:
         logger.exception(
-            "MongoDB Atlas connection failed. "
-            "Error type: %s, Details: %r",
+            "MongoDB client initialization failed: %s: %r",
             type(exc).__name__,
             exc,
         )
 
-        # Clean up failed connection
-        if db_instance.client is not None:
-            db_instance.client.close()
 
-        db_instance.client = None
-        db_instance.db = None
+async def _create_indexes(db: AsyncIOMotorDatabase):
+    """Creates performance and unique constraints on collections."""
+    try:
+        # Create unique indexes on users collection
+        user_col = db["users"]
+        await user_col.create_index([("email", ASCENDING)], unique=True, name="uniq_user_email")
+        await user_col.create_index([("username", ASCENDING)], unique=True, name="uniq_user_username")
+        await user_col.create_index([("full_name", ASCENDING)], name="idx_user_full_name")
+        await user_col.create_index([("is_active", ASCENDING), ("username", ASCENDING)], name="idx_active_username")
+
+        # Index follows collection
+        follows_col = db["follows"]
+        await follows_col.create_index([("follower_user_id", ASCENDING), ("following_user_id", ASCENDING)], unique=True, name="uniq_follow_relationship")
+        await follows_col.create_index([("follower_user_id", ASCENDING)], name="idx_follower_user_id")
+        await follows_col.create_index([("following_user_id", ASCENDING)], name="idx_following_user_id")
+
+        # Index posts collection
+        posts_col = db["posts"]
+        await posts_col.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)], name="idx_posts_user_created")
+        await posts_col.create_index([("created_at", DESCENDING)], name="idx_posts_created_at")
+
+        # Index likes collection
+        likes_col = db["likes"]
+        await likes_col.create_index([("user_id", ASCENDING), ("post_id", ASCENDING)], unique=True, name="uniq_user_post_like")
+
+        # Index comments collection
+        comments_col = db["comments"]
+        await comments_col.create_index([("post_id", ASCENDING), ("created_at", ASCENDING)], name="idx_comments_post_created")
+
+        # Index saved_posts collection
+        saved_col = db["saved_posts"]
+        await saved_col.create_index([("user_id", ASCENDING), ("post_id", ASCENDING)], unique=True, name="uniq_user_saved_post")
+
+        # Index conversations & messages
+        convs_col = db["conversations"]
+        await convs_col.create_index([("participant_ids", ASCENDING)], name="idx_conv_participants")
+        await convs_col.create_index([("updated_at", DESCENDING)], name="idx_conv_updated_at")
+
+        msgs_col = db["messages"]
+        await msgs_col.create_index([("conversation_id", ASCENDING), ("created_at", ASCENDING)], name="idx_messages_conv_created")
+
+        # Index notifications
+        notif_col = db["notifications"]
+        await notif_col.create_index([("recipient_id", ASCENDING), ("is_read", ASCENDING), ("created_at", DESCENDING)], name="idx_notif_recipient_read")
+
+        # Index blocks & reports
+        blocks_col = db["blocks"]
+        await blocks_col.create_index([("blocker_id", ASCENDING), ("blocked_id", ASCENDING)], unique=True, name="uniq_block_pair")
+
+        logger.info("MongoDB indexes verified successfully.")
+    except Exception as e:
+        logger.warning("Index creation encountered error: %s", e)
 
 
 async def close_mongo_connection():

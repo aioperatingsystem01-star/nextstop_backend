@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, status
@@ -57,6 +58,7 @@ app.include_router(notifications.router, prefix="/api")
 
 @app.get(
     "/health",
+    status_code=status.HTTP_200_OK,
     tags=["System"],
     summary="Health Check",
     description="Returns server status and database connectivity status.",
@@ -65,14 +67,14 @@ async def health_check():
     """Health check endpoint for Render, monitoring services, and client verification."""
     db = get_database()
     db_connected = False
-    if db is not None:
+    if db is not None and db.client is not None:
         try:
-            await db.client.admin.command("ping")
+            await asyncio.wait_for(db.client.admin.command("ping"), timeout=2.0)
             db_connected = True
         except Exception:
             db_connected = False
 
-    response_body = {
+    return {
         "status": "healthy" if db_connected else "degraded",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": {
@@ -81,13 +83,6 @@ async def health_check():
         },
         "version": "1.0.0",
     }
-
-    # Return HTTP 503 when database is unreachable so load balancers and
-    # Render health checks can detect backend degradation and retry/restart.
-    if not db_connected:
-        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=response_body)
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 
 
 @app.get("/", tags=["System"])
