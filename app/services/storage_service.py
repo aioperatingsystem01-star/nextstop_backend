@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - SUPABASE STORAGE SERVICE
+# Updated: 2026-11-09 | Supabase storage upsert boolean fix & lazy client init
+# ==============================================================================
 import io
 import logging
 import time

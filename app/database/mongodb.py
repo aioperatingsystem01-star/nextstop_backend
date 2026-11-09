@@ -1,4 +1,8 @@
 
+# ==============================================================================
+# NEXT STOP BACKEND - MONGODB ATLAS CONNECTION & INDEXING
+# Updated: 2026-11-09 | Non-blocking startup, certifi CA bundle, auto-retry
+# ==============================================================================
 import asyncio
 import logging
 import os

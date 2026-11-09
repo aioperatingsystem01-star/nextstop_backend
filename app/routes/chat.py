@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - CHAT & WEBSOCKET ROUTER
+# Updated: 2026-11-09 | Deduplicated message persistence (REST send + WS delivery)
+# ==============================================================================
 import json
 import logging
 from typing import Optional

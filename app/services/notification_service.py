@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - NOTIFICATION SERVICE
+# Updated: 2026-11-09 | 5-minute sliding window deduplication for likes & follows
+# ==============================================================================
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import uuid

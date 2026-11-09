@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - POSTS SERVICE
+# Updated: 2026-11-09 | Added get_post_by_id(), atomicity, hydration
+# ==============================================================================
 from datetime import datetime, timezone
 import re
 from typing import List, Optional

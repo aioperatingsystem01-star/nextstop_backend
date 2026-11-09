@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - POSTS & MEDIA ROUTES
+# Updated: 2026-11-09 | Route ordering fix (/saved/me before /{post_id}), get_post
+# ==============================================================================
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from app.core.dependencies import get_current_user

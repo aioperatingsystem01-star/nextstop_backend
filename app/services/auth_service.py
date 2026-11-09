@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - AUTHENTICATION SERVICE
+# Updated: 2026-11-09 | Profile field initialization defaults & safe dict access
+# ==============================================================================
 from datetime import datetime, timezone
 import uuid
 from typing import Optional

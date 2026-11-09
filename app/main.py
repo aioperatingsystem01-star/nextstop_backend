@@ -1,3 +1,7 @@
+# ==============================================================================
+# NEXT STOP BACKEND - MAIN APPLICATION
+# Updated: 2026-11-09 | Production-Ready Audit & Lifespan Non-Blocking Fix
+# ==============================================================================
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
