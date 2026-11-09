@@ -335,6 +335,15 @@ class PostService:
         has_more = (skip + len(saved_records)) < total
         return PostsListResponse(success=True, posts=posts, total=total, has_more=has_more)
 
+    async def get_post_by_id(self, post_id: str, current_user_id: Optional[str] = None) -> PostResponse:
+        """Fetches a single post by its ID with like/save status hydrated."""
+        post = await self.col.find_one({"id": post_id})
+        if not post:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+
+        posts = await self._hydrate_posts([post], current_user_id)
+        return posts[0]
+
     async def _hydrate_posts(self, docs: List[dict], current_user_id: Optional[str] = None) -> List[PostResponse]:
         if not docs:
             return []

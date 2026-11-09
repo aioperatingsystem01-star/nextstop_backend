@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 import uuid
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -34,16 +34,22 @@ class NotificationService:
         if recipient_id == actor_id:
             return None
 
-        # Check duplicate recent notification within 5 minutes for likes/follows
-        recent = await self.col.find_one({
-            "recipient_id": recipient_id,
-            "actor_id": actor_id,
-            "type": type,
-            "entity_id": entity_id,
-            "is_read": False,
-        })
-        if recent:
-            return None
+        # Check for a duplicate unread notification within a 5-minute window.
+        # This prevents spam (e.g., rapid multiple likes) while still sending
+        # new notifications after the user has cleared / had time between actions.
+        # For new_message type, we always notify (messages in same conv should alert).
+        if type != "new_message":
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+            recent = await self.col.find_one({
+                "recipient_id": recipient_id,
+                "actor_id": actor_id,
+                "type": type,
+                "entity_id": entity_id,
+                "is_read": False,
+                "created_at": {"$gte": cutoff},
+            })
+            if recent:
+                return None
 
         now = datetime.now(timezone.utc)
         notif = NotificationModel(

@@ -140,22 +140,13 @@ async def chat_websocket_endpoint(
                 if action == "ping":
                     await websocket.send_text(json.dumps({"event": "pong"}))
 
-                elif action == "send_message":
-                    conv_id = msg_json.get("conversation_id")
-                    text = msg_json.get("text", "")
-                    media_url = msg_json.get("media_url", "")
-                    message_type = msg_json.get("message_type", "text")
-                    recipient_id = msg_json.get("recipient_id")
-
-                    if conv_id and (text or media_url):
-                        await chat_service.send_message(
-                            conversation_id=conv_id,
-                            sender_id=user_id,
-                            text=text,
-                            media_url=media_url,
-                            message_type=message_type,
-                            recipient_id=recipient_id,
-                        )
+                # NOTE: Message persistence (send_message) is intentionally NOT handled
+                # over WebSocket. All message sending must go through the REST endpoint:
+                # POST /api/v1/conversations/{conversation_id}/messages
+                # The WebSocket channel is used for real-time delivery of events only
+                # (new_message notifications, typing indicators, read receipts).
+                # Allowing WS persistence would create duplicate messages when Flutter
+                # calls REST send AND the WebSocket handler also persists the same message.
 
                 elif action == "typing":
                     recipient_id = msg_json.get("recipient_id")

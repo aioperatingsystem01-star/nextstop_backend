@@ -99,7 +99,7 @@ class StorageService:
                 cli.storage.from_(self.bucket).upload(
                     path=file_path,
                     file=data,
-                    file_options={"content-type": content_type, "upsert": "true"},
+                    file_options={"content-type": content_type, "upsert": True},
                 )
                 # Obtain public URL from Supabase
                 public_res = cli.storage.from_(self.bucket).get_public_url(file_path)

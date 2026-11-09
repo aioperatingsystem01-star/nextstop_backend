@@ -110,6 +110,37 @@ async def get_user_posts(
     )
 
 
+# IMPORTANT: /saved/me MUST be declared BEFORE /{post_id} to prevent FastAPI
+# from matching the literal string "saved" as a post_id path parameter.
+@router.get(
+    "/saved/me",
+    response_model=PostsListResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get authenticated user's saved posts",
+)
+async def get_my_saved_posts(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=24, ge=1, le=60),
+    current_user: UserProfileResponse = Depends(get_current_user),
+) -> PostsListResponse:
+    """Returns posts saved by the user for the Profile Saved tab."""
+    return await post_service.get_saved_posts(current_user.id, page=page, limit=limit)
+
+
+@router.get(
+    "/{post_id}",
+    response_model=PostResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get a single post by ID",
+)
+async def get_post(
+    post_id: str,
+    current_user: UserProfileResponse = Depends(get_current_user),
+) -> PostResponse:
+    """Returns full post detail with like/save status for authenticated user."""
+    return await post_service.get_post_by_id(post_id, current_user_id=current_user.id)
+
+
 @router.delete(
     "/{post_id}",
     status_code=status.HTTP_200_OK,
@@ -179,18 +210,3 @@ async def toggle_save(
 ) -> SaveToggleResponse:
     """Toggles saved state for post."""
     return await post_service.toggle_save(post_id, current_user.id)
-
-
-@router.get(
-    "/saved/me",
-    response_model=PostsListResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Get authenticated user's saved posts",
-)
-async def get_my_saved_posts(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=24, ge=1, le=60),
-    current_user: UserProfileResponse = Depends(get_current_user),
-) -> PostsListResponse:
-    """Returns posts saved by the user for the Profile Saved tab."""
-    return await post_service.get_saved_posts(current_user.id, page=page, limit=limit)

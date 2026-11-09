@@ -57,7 +57,6 @@ app.include_router(notifications.router, prefix="/api")
 
 @app.get(
     "/health",
-    status_code=status.HTTP_200_OK,
     tags=["System"],
     summary="Health Check",
     description="Returns server status and database connectivity status.",
@@ -73,15 +72,22 @@ async def health_check():
         except Exception:
             db_connected = False
 
-    return {
-        "status": "healthy",
+    response_body = {
+        "status": "healthy" if db_connected else "degraded",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": {
-            "status": "connected" if db_connected else "disconnected/configured",
+            "status": "connected" if db_connected else "disconnected",
             "name": settings.database_name,
         },
         "version": "1.0.0",
     }
+
+    # Return HTTP 503 when database is unreachable so load balancers and
+    # Render health checks can detect backend degradation and retry/restart.
+    if not db_connected:
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=response_body)
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=response_body)
 
 
 @app.get("/", tags=["System"])

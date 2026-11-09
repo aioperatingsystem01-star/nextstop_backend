@@ -63,6 +63,16 @@ class AuthService:
             "mobile_number": data.mobile_number,
             "hashed_password": hashed,
             "is_active": True,
+            # Optional profile fields – initialized to safe defaults so get_user_profile()
+            # never raises KeyError on freshly registered accounts.
+            "profile_picture": "",
+            "avatar_url": "",
+            "bio": "",
+            "website": "",
+            "is_verified": False,
+            "followers_count": 0,
+            "following_count": 0,
+            "posts_count": 0,
             "created_at": now,
             "updated_at": now,
         }
@@ -137,8 +147,16 @@ class AuthService:
             full_name=user["full_name"],
             username=user["username"],
             email=user["email"],
-            mobile_number=user["mobile_number"],
+            mobile_number=user.get("mobile_number", ""),
             created_at=user["created_at"],
+            profile_picture=user.get("profile_picture") or user.get("avatar_url") or "",
+            avatar_url=user.get("avatar_url") or user.get("profile_picture") or "",
+            bio=user.get("bio", ""),
+            website=user.get("website", ""),
+            is_verified=bool(user.get("is_verified", False)),
+            followers_count=int(user.get("followers_count", 0)),
+            following_count=int(user.get("following_count", 0)),
+            posts_count=int(user.get("posts_count", 0)),
         )
 
         access_token = create_access_token({
@@ -199,8 +217,16 @@ class AuthService:
             full_name=user["full_name"],
             username=user["username"],
             email=user["email"],
-            mobile_number=user["mobile_number"],
+            mobile_number=user.get("mobile_number", ""),
             created_at=user["created_at"],
+            profile_picture=user.get("profile_picture") or user.get("avatar_url") or "",
+            avatar_url=user.get("avatar_url") or user.get("profile_picture") or "",
+            bio=user.get("bio", ""),
+            website=user.get("website", ""),
+            is_verified=bool(user.get("is_verified", False)),
+            followers_count=int(user.get("followers_count", 0)),
+            following_count=int(user.get("following_count", 0)),
+            posts_count=int(user.get("posts_count", 0)),
         )
 
         new_access_token = create_access_token({
